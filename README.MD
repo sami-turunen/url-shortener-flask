@@ -27,23 +27,25 @@ A lightweight, dependency-free URL shortener built with Python, Flask, and SQLit
 
 ### Prerequisites
 
-Ensure Python 3.8+ is installed on your machine. Install Flask via `pip`:
+- Ensure Python 3.6+ is installed on your machine
+- Flask
 
-```bash
-pip install flask
-```
-
-Clone the repository:
+### Clone the repository:
 ```bash
 git clone https://github.com/sami-turunen/url-shortener-flask
 ```
 
-Install flask:
+### Change to the correct folder:
+```bash
+cd url-shortener-flask
+```
+
+### Install flask
 ```bash
 pip install flask
 ```
 
-Start the app:
+### Start the app:
 ```bash
 python main.py
 ```
