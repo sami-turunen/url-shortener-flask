@@ -1,15 +1,31 @@
-#!/usr/bin/env python3
 import re
 import sqlite3
 import string
+'''
+Some notes on the use of random library
+It uses the Mersenne Twister pseudo-random number generator and therefore it is not cryptographically secure
+I see it fine to use it here, but the secrets library would be better to use when security is a concern (here it is not)
+'''
 import random
 from flask import Flask, request, redirect, jsonify, g, abort
 
-DB_PATH = "urls.db"
-CODE_LENGTH = 6
-CODE_ALPHABET = string.ascii_letters + string.digits
+DB_PATH = "urls.db" # Path to our sqlite database file
 
-app = Flask(__name__)
+CODE_LENGTH = 6 # Length of the code after the last slash
+
+CODE_ALPHABET = string.ascii_letters + string.digits # String of all characters that can be used in the code
+
+app = Flask(__name__) # Create a Flask app
+
+'''
+This function will return a database connection object
+If there is no database yet, it will create one
+
+About thread safety:
+If this connection is shared by multiple threads, ProgrammingError will be raised
+g stores the connection for the duration of a single http request
+Every request handles its own connection, which is automatically closed because of @app.teardown_appcontext
+'''
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:
@@ -18,6 +34,9 @@ def get_db():
     return db
 
 
+'''
+Function to close the database connection
+'''
 @app.teardown_appcontext
 def close_db(exception):
     db = getattr(g, "_database", None)
@@ -25,6 +44,12 @@ def close_db(exception):
         db.close()
 
 
+'''
+Initialize the database with a "urls" table
+This table will store the original URL and the the code that will be used to access it
+
+Note: This function will need to be called manually, because it is not called by the app
+'''
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
@@ -39,9 +64,12 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Regular expression to check if the URL is valid
 URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 
-
+'''
+Function to normalize the URL (strip white space, add http:// if missing and make sure it is a valid URL)
+'''
 def normalize_url(url: str) -> str:
     url = url.strip()
     if not URL_RE.match(url):
@@ -49,6 +77,12 @@ def normalize_url(url: str) -> str:
     return url
 
 
+'''
+Generate a random code of the given length
+The characters used in the code are all from CODE_ALPHABET string
+
+Potential endless loop if the db collision rate approaches 100%
+'''
 def generate_code(db, length: int = CODE_LENGTH) -> str:
     while True:
         code = "".join(random.choices(CODE_ALPHABET, k=length))
@@ -59,6 +93,25 @@ def generate_code(db, length: int = CODE_LENGTH) -> str:
             return code
 
 
+'''
+HTML structure of the home page
+
+The javascript code at the bottom only declares an asynchronous function to shorten the URL
+This function is attached to the "Shorten" button
+
+It will grab the URL from the #url input field and send it to the /api/shorten route
+
+Json format of the response from the API:
+{
+    "short_url": string,
+    "code": string,
+    "original_url": string
+}
+
+The result of the shortening is displayed in the #result div
+
+When res.ok is false, it parses the data.error field and displays it in the #result div instead of a link
+'''
 INDEX_HTML = """
 <!doctype html>
 <html>
@@ -67,24 +120,32 @@ INDEX_HTML = """
     <title>URL Shortener</title>
     <style>
         body { font-family: sans-serif; max-width: 480px; margin: 60px auto; }
-        input[type=text] { width: 100%; padding: 8px; box-sizing: border-box; }
-        button { margin-top: 10px; padding: 8px 16px; }
+        input[type=text] { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        button { padding: 8px 16px; }
         #result { margin-top: 20px; word-break: break-all; }
     </style>
 </head>
 <body>
     <h2>URL Shortener</h2>
     <input type="text" id="url" placeholder="https://example.com/some/long/url">
+    <input type="text" id="custom_code" placeholder="Custom code (optional)">
     <button onclick="shorten()">Shorten</button>
     <div id="result"></div>
 
     <script>
         async function shorten() {
             const url = document.getElementById('url').value;
+            const customCode = document.getElementById('custom_code').value.trim();
+            
+            const payload = { url };
+            if (customCode) {
+                payload.code = customCode;
+            }
+
             const res = await fetch('/api/shorten', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({url})
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             const result = document.getElementById('result');
@@ -100,12 +161,24 @@ INDEX_HTML = """
 </html>
 """
 
-
+'''
+Root route of the app
+We will just return the home page specified above
+'''
 @app.route("/")
 def index():
     return INDEX_HTML
 
+'''
+Api route to shorten a URL
 
+custom_code is an optional parameter that can be used to specify a custom code for the URL
+
+Status codes:
+200 - Success
+400 - Bad request (missing url or invalid custom code)
+409 - Code already taken
+'''
 @app.route("/api/shorten", methods=["POST"])
 def api_shorten():
     data = request.get_json(silent=True) or {}
@@ -139,6 +212,15 @@ def api_shorten():
     return jsonify({"short_url": short_url, "code": code, "original_url": url})
 
 
+'''
+Route to redirect to the original URL, given the code
+
+Note: This function will perform a write operation on the database. More specifically, it will increment the clicks counter
+
+Status codes:
+302 - Redirect to the original URL
+404 - Code not found - returns the default 404 error page
+'''
 @app.route("/<code>")
 def redirect_to_url(code):
     db = get_db()
@@ -152,6 +234,23 @@ def redirect_to_url(code):
     return redirect(row["original_url"], code=302)
 
 
+'''
+Api route to get the stats of a code
+
+The statistics include the original URL, the number of clicks and the code itself
+If the code is not found, a 404 error is returned
+
+Status codes:
+200 - Success
+404 - Code not found
+
+Json format of the response:
+{
+    "code": string,
+    "original_url": string,
+    "clicks": int
+}
+'''
 @app.route("/api/stats/<code>")
 def api_stats(code):
     db = get_db()
@@ -166,5 +265,6 @@ def api_stats(code):
 
 
 if __name__ == "__main__":
+    # Initialize the database and start the app
     init_db()
     app.run(debug=True, port=5000)
