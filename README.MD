@@ -1,6 +1,6 @@
 # Flask URL Shortener
 
-A lightweight, dependency-free URL shortener built with Python, Flask, and SQLite. It provides a web interface for generating short links, supports custom aliases, tracks redirect click counts, and exposes a RESTful API.
+A lightweight URL shortener built with Python, Flask, and SQLite. It provides a web interface for generating short links, supports custom aliases, tracks redirect click counts, and exposes a RESTful API.
 
 ---
 
