@@ -6,7 +6,7 @@ A lightweight URL shortener built with Python, Flask, and SQLite. It provides a 
 
 ## Features
 
-- **Single-File Architecture**: Self-contained web app with embedded HTML UI and inline JavaScript.
+- **Single-File Architecture**: Self-contained web app with embedded HTML UI and internal JavaScript.
 - **Custom Short Codes**: Allows optional user-defined codes (`A-Z`, `a-z`, `0-9`, `_`, `-`, length 3–32).
 - **Collision Resistance**: Auto-generates unique 6-character random alphanumeric codes.
 - **URL Normalization**: Handles missing schemes (`http://`/`https://`) and whitespace trimming automatically.
@@ -20,6 +20,7 @@ A lightweight URL shortener built with Python, Flask, and SQLite. It provides a 
 - **Language**: Python 3.13
 - **Framework**: Flask
 - **Database**: SQLite3 (embedded)
+- **Testing**: Pytest
 
 ---
 
@@ -40,9 +41,14 @@ git clone https://github.com/sami-turunen/url-shortener-flask
 cd url-shortener-flask
 ```
 
-### Install flask
+### Install flask and pytest
 ```bash
-pip install flask
+pip install flask pytest
+```
+
+### Run the tests
+```bash
+python -m pytest -v
 ```
 
 ### Start the app:

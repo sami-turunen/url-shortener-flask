@@ -2,9 +2,8 @@ import re
 import sqlite3
 import string
 '''
-Some notes on the use of random library
-It uses the Mersenne Twister pseudo-random number generator and therefore it is not cryptographically secure
-I see it fine to use it here, but the secrets library would be better to use when security is a concern (here it is not)
+The random libary uses the Mersenne Twister pseudo-random number generator and therefore it is not cryptographically secure
+If security was a concern, we would need a more secure random number generator such as the one found in the secrets library
 '''
 import random
 from flask import Flask, request, redirect, jsonify, g, abort
@@ -80,8 +79,6 @@ def normalize_url(url: str) -> str:
 '''
 Generate a random code of the given length
 The characters used in the code are all from CODE_ALPHABET string
-
-Potential endless loop if the db collision rate approaches 100%
 '''
 def generate_code(db, length: int = CODE_LENGTH) -> str:
     while True:
@@ -163,7 +160,7 @@ INDEX_HTML = """
 
 '''
 Root route of the app
-We will just return the home page specified above
+Return the home page specified above
 '''
 @app.route("/")
 def index():
