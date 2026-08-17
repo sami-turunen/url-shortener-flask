@@ -12,6 +12,14 @@ DB_PATH = "urls.db" # Path to our sqlite database file
 
 CODE_LENGTH = 6 # Length of the code after the last slash
 
+SUCCESS_CODE = 200
+REDIRECT = 302
+BAD_REQUEST = 400
+NOT_FOUND = 404
+CODE_ALREADY_TAKEN = 409
+
+PORT = 5000
+
 CODE_ALPHABET = string.ascii_letters + string.digits # String of all characters that can be used in the code
 
 app = Flask(__name__) # Create a Flask app
@@ -181,7 +189,7 @@ def api_shorten():
     data = request.get_json(silent=True) or {}
     url = data.get("url", "")
     if not url or not url.strip():
-        return jsonify({"error": "Missing 'url' field"}), 400
+        return jsonify({"error": "Missing 'url' field"}), BAD_REQUEST
 
     url = normalize_url(url)
     db = get_db()
@@ -189,12 +197,12 @@ def api_shorten():
     custom_code = data.get("code")
     if custom_code:
         if not re.fullmatch(r"[A-Za-z0-9_-]{3,32}", custom_code):
-            return jsonify({"error": "Invalid custom code"}), 400
+            return jsonify({"error": "Invalid custom code"}), BAD_REQUEST
         exists = db.execute(
             "SELECT 1 FROM urls WHERE code = ?", (custom_code,)
         ).fetchone()
         if exists:
-            return jsonify({"error": "Code already taken"}), 409
+            return jsonify({"error": "Code already taken"}), CODE_ALREADY_TAKEN
         code = custom_code
     else:
         code = generate_code(db)
@@ -225,10 +233,10 @@ def redirect_to_url(code):
         "SELECT original_url FROM urls WHERE code = ?", (code,)
     ).fetchone()
     if row is None:
-        abort(404)
+        abort(NOT_FOUND)
     db.execute("UPDATE urls SET clicks = clicks + 1 WHERE code = ?", (code,))
     db.commit()
-    return redirect(row["original_url"], code=302)
+    return redirect(row["original_url"], code=REDIRECT)
 
 
 '''
@@ -255,7 +263,7 @@ def api_stats(code):
         "SELECT original_url, clicks FROM urls WHERE code = ?", (code,)
     ).fetchone()
     if row is None:
-        return jsonify({"error": "Code not found"}), 404
+        return jsonify({"error": "Code not found"}), NOT_FOUND
     return jsonify(
         {"code": code, "original_url": row["original_url"], "clicks": row["clicks"]}
     )
@@ -264,4 +272,4 @@ def api_stats(code):
 if __name__ == "__main__":
     # Initialize the database and start the app
     init_db()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=PORT)

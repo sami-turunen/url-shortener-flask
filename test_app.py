@@ -2,11 +2,8 @@ import pytest
 import main as main_module
 from main import app, init_db
 from main import CODE_LENGTH
+from main import SUCCESS_CODE, REDIRECT, NOT_FOUND, CODE_ALREADY_TAKEN
 
-SUCCESS_CODE = 200
-REDIRECT = 302
-NOT_FOUND = 404
-CODE_ALREADY_TAKEN = 409
 
 @pytest.fixture
 def client(tmp_path):
